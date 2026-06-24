@@ -34,7 +34,7 @@ public class AuthService {
                                 request.getPassword()
                         )
                 )
-                .role(Role.ADMIN)
+                .role(Role.EMPLOYEE)
                 .build();
         userRepository.save(user);
         return "User Registered Successfully....";
