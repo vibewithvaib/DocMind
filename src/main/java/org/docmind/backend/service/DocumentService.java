@@ -1,12 +1,15 @@
 package org.docmind.backend.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.docmind.backend.dto.document.DocumentResponse;
 import org.docmind.backend.entity.Document;
+import org.docmind.backend.entity.DocumentChunk;
 import org.docmind.backend.entity.User;
 import org.docmind.backend.exception.DocumentNotFoundException;
 import org.docmind.backend.exception.InvalidFileTypeException;
 import org.docmind.backend.exception.UserNotFoundException;
+import org.docmind.backend.repository.DocumentChunkRepository;
 import org.docmind.backend.repository.DocumentRepository;
 import org.docmind.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +27,8 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final PdfProcessingService pdfProcessingService;
+    private final DocumentChunkRepository documentChunkRepository;
+    private final VectorStoreService vectorStoreService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -72,57 +77,42 @@ public class DocumentService {
                 .toList();
     }
 
+
+    @Transactional
     public void deleteDocument(Long documentId) throws IOException {
 
-        Document document =
-                documentRepository
-                        .findById(documentId)
-                        .orElseThrow(
-                                () ->
-                                        new DocumentNotFoundException(
-                                                "Document not found"
-                                        )
+        Document document = documentRepository.findById(documentId)
+                        .orElseThrow(() -> new DocumentNotFoundException("Document not found")
                         );
+        List<DocumentChunk> chunks = documentChunkRepository.findByDocument(document);
 
-        Path filePath =
-                Paths.get(
-                        document.getFilePath()
-                );
+        for(DocumentChunk chunk : chunks){
+            vectorStoreService.deleteEmbedding(chunk.getId());
+        }
 
-        Files.deleteIfExists(
-                filePath
-        );
+        Path filePath = Paths.get(document.getFilePath());
 
-        documentRepository.delete(
-                document
-        );
+        Files.deleteIfExists(filePath);
+
+        documentRepository.delete(document);
     }
 
     private void validatePdf(MultipartFile file) {
 
         if (file.isEmpty()) {
-
-            throw new InvalidFileTypeException(
-                    "File cannot be empty"
-            );
+            throw new InvalidFileTypeException("File cannot be empty");
         }
 
-        if (!"application/pdf".equals(
-                file.getContentType()
-        )) {
-
+        if (!"application/pdf".equals(file.getContentType())) {
             throw new InvalidFileTypeException(
                     "Only PDF files are allowed"
             );
         }
     }
 
-    private DocumentResponse mapToResponse(
-            Document document
-    ) {
+    private DocumentResponse mapToResponse(Document document) {
 
-        return DocumentResponse
-                .builder()
+        return DocumentResponse.builder()
                 .id(document.getId())
                 .fileName(
                         document.getFileName()

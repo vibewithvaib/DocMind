@@ -15,13 +15,18 @@ public class VectorStoreService {
     private final VectorStore vectorStore;
     public void storeChunk(Long chunkId, Long documentId, String fileName, String chunkText) {
 
-        Document document = new Document(chunkText, Map.of(
+        Document document = new Document("chunk-" + chunkId,chunkText, Map.of(
                 "chunkId", chunkId,
                 "documentId", documentId,
                 "fileName", fileName)
                 );
+
         vectorStore.add(
                 List.of(document)
         );
+
+    }
+    public void deleteEmbedding(Long chunkId) {
+        vectorStore.delete(List.of("chunk-" + chunkId));
     }
 }
